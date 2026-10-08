@@ -19,10 +19,8 @@ pres.title = "Кото-кафе «Мурчалка» — бизнес-план";
 pres.subject = "Капитал, расходы и срок окупаемости";
 const C = pres.SchemeColor;
 
-const fmt = (n, d = 1) => n.toLocaleString("ru-RU", { maximumFractionDigits: d }).replace(/ /g, " ");
-const mln = (n) => fmt(n / 1e6) + " млн ₽";
-const tys = (n) => fmt(Math.round(n / 1000), 0) + " тыс. ₽";
-const short = (n) => (n >= 1e6 ? fmt(n / 1e6) + " млн" : fmt(Math.round(n / 1000), 0) + " тыс.");
+const { money, full } = require("./format");
+const M = (n) => money(n, { unit: false }); // без «сум»: «220 млн»
 
 // ---------- Макеты ----------
 pres.defineSlideMaster({
@@ -104,7 +102,7 @@ pres.addSection({ title: "Деньги" });
 {
   const s = pres.addSlide({ masterName: "CONTENT", sectionTitle: "Деньги" });
   s.addText("Что нужно для старта", { placeholder: "title" });
-  pill(s, 7.0, 0.42, 2.45, 0.5, `Всего ${mln(N.investment)}`, { size: 16, name: "Итого капитал" });
+  pill(s, 7.0, 0.42, 2.45, 0.5, `Всего ${money(N.investment)}`, { size: 16, name: "Итого капитал" });
   text(s, "свои 60% · кредит 40%", 7.0, 0.98, 2.45, 0.3, { fontSize: 11, color: C.text2, align: "center" });
 
   const groups = ["Ремонт и мебель", "Запуск", "Подушка", "Кухня", "Котики"];
@@ -116,7 +114,7 @@ pres.addSection({ title: "Деньги" });
     card(s, x, y, w, 2.6, `Статья ${g}`);
     sticker(s, pics[g], x + 0.16, y + 0.08, 1.3, `Стикер ${g}`);
     dot(s, x + 0.2, y + 1.55, T.chart[i], `Цвет ${g}`);
-    text(s, short(sums[i]), x + 0.42, y + 1.43, w - 0.5, 0.4, { fontFace: HEAD, fontSize: 17, valign: "middle" });
+    text(s, M(sums[i]), x + 0.42, y + 1.43, w - 0.5, 0.4, { fontFace: HEAD, fontSize: 17, valign: "middle" });
     text(s, label[g], x + 0.15, y + 1.9, w - 0.3, 0.6, { fontSize: 11, color: C.text2 });
   });
 
@@ -135,7 +133,7 @@ pres.addSection({ title: "Деньги" });
       { fontFace: HEAD, fontSize: 13, color: "FFFFFF", align: "center", valign: "middle", objectName: `Доля ${groups[i]}` });
     acc += sh;
   });
-  s.addNotes("Для открытия нужно 4,5 млн ₽: 1,8 млн — ремонт и мебель, 950 тыс. — запуск, 800 тыс. — подушка, 700 тыс. — кухня, 250 тыс. — всё для котиков. 60% — свои деньги, 40% — кредит на 3 года.");
+  s.addNotes(`Для открытия нужно ${money(N.investment)}: ${groups.map((g, i) => `${M(sums[i])} — ${label[g]}`).join(", ")}. 60% — свои деньги, 40% — кредит на 3 года.`);
 }
 
 // ---------- 4. Расходы ----------
@@ -143,21 +141,21 @@ pres.addSection({ title: "Деньги" });
   const s = pres.addSlide({ masterName: "CONTENT", sectionTitle: "Деньги" });
   s.addText("Расходы каждый месяц", { placeholder: "title" });
   sticker(s, "receipt.png", 0.85, 1.05, 2.3, "Котик с чеком");
-  text(s, tys(N.fixedPerMonth), 0.55, 3.4, 3.2, 0.7, { fontFace: HEAD, fontSize: 34, color: C.accent1, align: "center", valign: "middle" });
+  text(s, money(N.fixedPerMonth), 0.55, 3.4, 3.2, 0.7, { fontFace: HEAD, fontSize: 34, color: C.accent1, align: "center", valign: "middle" });
   text(s, "в месяц, даже если гостей нет", 0.55, 4.08, 3.2, 0.3, { fontSize: 13, color: C.text2, align: "center" });
   pill(s, 0.75, 4.55, 2.8, 0.45, "+ 24% от выручки", { size: 14, fill: C.background1, color: C.accent1, name: "Переменные расходы" });
 
   card(s, 3.95, 1.2, 5.5, 3.9, "Карточка графика расходов");
   const rows = N.monthlyFixed;
-  s.addChart(pres.charts.BAR, [{ name: "тыс. ₽", labels: rows.map((r) => r.short), values: rows.map((r) => r.sum / 1000) }], {
+  s.addChart(pres.charts.BAR, [{ name: "млн сум", labels: rows.map((r) => r.short), values: rows.map((r) => r.sum / 1e6) }], {
     x: 4.1, y: 1.3, w: 5.2, h: 3.7, barDir: "bar", catAxisOrientation: "maxMin", barGapWidthPct: 55,
     chartColors: [K.accent1], ...chartBase(), valAxisHidden: true, valGridLine: { style: "none" },
     catAxisLabelFontSize: 12, catAxisLabelColor: K.dk1,
     showValue: true, dataLabelPosition: "outEnd", dataLabelFormatCode: "0", dataLabelFontBold: true,
-    objectName: "Расходы по статьям, тыс. ₽",
+    objectName: "Расходы по статьям, млн сум",
   });
-  text(s, "тыс. ₽", 8.65, 4.72, 0.7, 0.25, { fontSize: 10, color: C.text2, align: "right" });
-  s.addNotes("Каждый месяц — около 765 тыс. ₽: зарплата команды 420 тыс., аренда 150 тыс., остальное — реклама, коммуналка, котики, проценты по кредиту. Плюс продукты, мерч и налог — 24% от выручки.");
+  text(s, "млн сум", 8.45, 4.72, 0.9, 0.25, { fontSize: 10, color: C.text2, align: "right" });
+  s.addNotes(`Каждый месяц — около ${money(N.fixedPerMonth)}: зарплата команды ${M(rows[0].sum)}, аренда ${M(rows[1].sum)}, остальное — реклама, коммуналка, котики, проценты по кредиту. Плюс продукты, мерч и налоги — 24% от выручки.`);
 }
 
 // ---------- 5. Доходы ----------
@@ -167,11 +165,12 @@ pres.addSection({ title: "Деньги" });
 
   card(s, 0.55, 1.2, 3.75, 3.9, "Средний чек");
   text(s, "Средний чек", 0.8, 1.35, 3.3, 0.3, { fontFace: HEAD, fontSize: 13, color: C.text2 });
-  text(s, `${N.avgCheck} ₽`, 0.8, 1.62, 3.3, 0.7, { fontFace: HEAD, fontSize: 40, color: C.accent1, valign: "middle" });
+  text(s, [{ text: full(N.avgCheck).replace(" сум", "") }, { text: " сум", options: { fontSize: 22 } }], 0.8, 1.62, 3.3, 0.7, { fontFace: HEAD, fontSize: 40, color: C.accent1, valign: "middle" });
   const parts = N.check;
   const checkColors = [T.chart[0], T.chart[1], T.chart[2]];
   s.addChart(pres.charts.BAR, parts.map((p) => ({ name: p.short, labels: ["Чек"], values: [p.sum] })), {
-    x: 0.7, y: 2.35, w: 3.45, h: 0.6, barDir: "bar", barGrouping: "stacked", barGapWidthPct: 10,
+    x: 0.8, y: 2.4, w: 3.25, h: 0.5, barDir: "bar", barGrouping: "stacked", barGapWidthPct: 0,
+    layout: { x: 0, y: 0, w: 1, h: 1 }, valAxisMinVal: 0, valAxisMaxVal: N.avgCheck,
     chartColors: checkColors, ...chartBase(), catAxisHidden: true, valAxisHidden: true, valGridLine: { style: "none" },
     objectName: "Состав среднего чека",
   });
@@ -179,7 +178,7 @@ pres.addSection({ title: "Деньги" });
     const y = 3.05 + i * 0.38;
     dot(s, 0.85, y + 0.08, checkColors[i], `Цвет ${p.short}`);
     text(s, p.short, 1.1, y, 1.5, 0.32, { fontSize: 14, valign: "middle" });
-    text(s, `${p.sum} ₽`, 2.0, y, 0.8, 0.32, { fontFace: HEAD, fontSize: 14, align: "right", valign: "middle" });
+    text(s, M(p.sum), 1.85, y, 0.95, 0.32, { fontFace: HEAD, fontSize: 14, align: "right", valign: "middle" });
   });
   sticker(s, "barista.png", 2.75, 3.3, 1.65, "Котик-бариста");
 
@@ -203,7 +202,7 @@ pres.addSection({ title: "Деньги" });
   dot(s, 5.8, 4.72, T.pos, "Цвет выше");
   text(s, "прибыль", 6.02, 4.66, 0.9, 0.28, { fontSize: 11, color: C.text2, valign: "middle" });
   text(s, `- - -  ${N.breakEvenGuestsPerDay} гостей = безубыточность`, 6.9, 4.66, 2.45, 0.28, { fontSize: 11, color: C.text2, valign: "middle", align: "right" });
-  s.addNotes("Средний чек — 950 ₽: 500 за котиков, 380 кафе, 70 мерч. С гостя остаётся около 722 ₽. Безубыточность — 36 гостей в день. В январе ждём 20 гостей, к декабрю — 57: это всего 22% загрузки зала.");
+  s.addNotes(`Средний чек — ${full(N.avgCheck)}: ${parts.map((p) => `${M(p.sum)} — ${p.short.toLowerCase()}`).join(", ")}. С гостя остаётся около ${full(N.marginPerGuest)}. Безубыточность — ${N.breakEvenGuestsPerDay} гостей в день. В январе ждём ${y1[0].guestsPerDay} гостей, к декабрю — ${y1[11].guestsPerDay}: это всего ${Math.round(N.loadAt(y1[11].guestsPerDay) * 100)}% загрузки зала.`);
 }
 
 // ---------- 6. Когда придёт прибыль ----------
@@ -211,15 +210,15 @@ pres.addSection({ title: "Деньги" });
   const s = pres.addSlide({ masterName: "CONTENT", sectionTitle: "Деньги" });
   s.addText("Когда придёт прибыль", { placeholder: "title" });
   card(s, 0.55, 1.2, 6.25, 3.9, "Карточка графика окупаемости");
-  text(s, "Сколько заработали с начала, млн ₽", 0.8, 1.35, 5.0, 0.3, { fontFace: HEAD, fontSize: 13, color: C.text2 });
+  text(s, "Сколько заработали с начала, млн сум", 0.8, 1.35, 5.0, 0.3, { fontFace: HEAD, fontSize: 13, color: C.text2 });
   const pts = [{ n: 0, cumulative: -N.investment }, ...N.months];
   const vals = pts.map((m) => Math.round(m.cumulative / 1e5) / 10);
   const cols = vals.map((v) => (v < 0 ? T.neg : T.pos));
-  s.addChart(pres.charts.BAR, [{ name: "Накоплено, млн ₽", labels: pts.map((m) => String(m.n)), values: vals }], {
+  s.addChart(pres.charts.BAR, [{ name: "Накоплено, млн сум", labels: pts.map((m) => String(m.n)), values: vals }], {
     x: 0.65, y: 1.65, w: 6.05, h: 3.05, barDir: "col", barGapWidthPct: 35,
     chartColors: cols, invertedColors: cols, ...chartBase(),
     catAxisLabelPos: "low", catAxisLabelFrequency: 2, catAxisLabelFontSize: 10,
-    valAxisMinVal: -6, valAxisMaxVal: 5, valAxisMajorUnit: 2, valAxisLabelFormatCode: "0",
+    valAxisMinVal: -800, valAxisMaxVal: 400, valAxisMajorUnit: 200, valAxisLabelFormatCode: "0",
     objectName: "Накопленная прибыль по месяцам",
   });
   text(s, "месяц работы →", 4.9, 4.72, 1.75, 0.25, { fontSize: 10, color: C.text2, align: "right" });
@@ -231,7 +230,7 @@ pres.addSection({ title: "Деньги" });
   text(s, `${N.paybackMonth}-й месяц`, 7.05, 2.6, 2.4, 0.5, { fontFace: HEAD, fontSize: 24, color: C.accent2, align: "center", valign: "middle" });
   text(s, "вложения вернулись", 7.05, 3.1, 2.4, 0.3, { fontSize: 13, color: C.text2, align: "center" });
   sticker(s, "success.png", 7.45, 3.65, 1.6, "Котик празднует");
-  s.addNotes("Первые 3 месяца — убыток около 605 тыс. ₽, его покрывает подушка. С 4-го месяца — прибыль. За 1-й год: выручка 15 млн, прибыль 2,2 млн. На 17-м месяце вложения 4,5 млн полностью вернутся.");
+  s.addNotes(`Первые 3 месяца — убыток около ${money(N.earlyLoss)}, его покрывает подушка. С ${N.firstProfitMonth}-го месяца — прибыль. За 1-й год: выручка ${money(N.year1.revenue)}, прибыль ${money(N.year1.profit)}. На ${N.paybackMonth}-м месяце вложения ${money(N.investment)} полностью вернутся.`);
 }
 
 // ---------- 7. Итоги ----------
@@ -240,10 +239,10 @@ pres.addSection({ title: "Итоги" });
   const s = pres.addSlide({ masterName: "CONTENT", sectionTitle: "Итоги" });
   s.addText("Итоги", { placeholder: "title" });
   const kpi = [
-    [mln(N.investment), "вложения"],
+    [money(N.investment), "вложения"],
     [`${N.firstProfitMonth}-й мес.`, "первая прибыль"],
     [`${N.paybackMonth} мес.`, "окупаемость"],
-    [mln(N.year2.profit), "прибыль 2-го года"],
+    [money(N.year2.profit), "прибыль 2-го года"],
   ];
   kpi.forEach(([big, small], i) => {
     const x = 0.55 + (i % 2) * 3.0, y = 1.2 + Math.floor(i / 2) * 1.2;
@@ -255,7 +254,7 @@ pres.addSection({ title: "Итоги" });
   text(s, "С радостью отвечу на вопросы", 0.55, 4.3, 4.4, 0.4, { fontSize: 16, color: C.text2 });
   sticker(s, "thanks.png", 5.0, 3.55, 1.5, "Котики машут лапкой");
   sticker(s, "girl_portrait.png", 6.4, 0.75, 3.5, "Арт: портрет с кофе и котёнком");
-  s.addNotes("Итого: вложения 4,5 млн, первая прибыль на 4-й месяц, окупаемость 17 месяцев, во второй год прибыль около 6,4 млн. «Мурчалка» зарабатывает и помогает котикам найти дом. Спасибо за внимание!");
+  s.addNotes(`Итого: вложения ${money(N.investment)}, первая прибыль на ${N.firstProfitMonth}-й месяц, окупаемость ${N.paybackMonth} месяцев, во второй год прибыль около ${money(N.year2.profit)}. «Мурчалка» зарабатывает и помогает котикам найти дом. Спасибо за внимание!`);
 }
 
 pres.writeFile({ fileName: OUT }).then(async () => {
