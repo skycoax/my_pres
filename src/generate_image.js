@@ -5,7 +5,7 @@
 const fs = require("fs");
 const path = require("path");
 
-const DEFAULT_MODEL = "google/gemini-2.5-flash-image";
+const DEFAULT_MODEL = "google/gemini-nano-banana-2.1";
 
 async function generate({ prompt, out, refs = [], model = DEFAULT_MODEL }) {
   const key = process.env.OPENROUTER_API_KEY;
@@ -28,6 +28,9 @@ async function generate({ prompt, out, refs = [], model = DEFAULT_MODEL }) {
 
   const url = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
   if (!url) throw new Error("No image in response: " + JSON.stringify(data).slice(0, 500));
+  // Модель сама выбирает формат (PNG или JPEG) — подгоняем расширение под него.
+  const ext = url.startsWith("data:image/jpeg") ? ".jpg" : ".png";
+  out = out.replace(/\.(png|jpe?g)$/i, "") + ext;
   fs.writeFileSync(out, Buffer.from(url.split(",")[1], "base64"));
   return { out, cost: data.usage?.cost };
 }
