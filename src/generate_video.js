@@ -168,7 +168,8 @@ async function generate(opts, { key, size, lens, prompt, tmp, videoUrls }) {
       duration: lens[i],
       resolution: opts.resolution,
       aspect_ratio: opts.aspect,
-      generate_audio: false, // звук берём из оригинала — он совпадает с таймингом
+      // звук берём из оригинала — он совпадает с таймингом; HeyGen звук не отключает
+      ...(opts.model.startsWith("heygen/") ? {} : { generate_audio: false }),
       input_references: [
         { type: "image_url", image_url: { url: dataUrl(opts.main) } }, // image 1 — главный герой
         ...(opts.crowd ? [{ type: "image_url", image_url: { url: dataUrl(opts.crowd) } }] : []), // image 2 — толпа
