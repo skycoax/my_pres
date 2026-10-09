@@ -5,11 +5,14 @@
 //   OPENROUTER_API_KEY=... NODE_USE_ENV_PROXY=1 node src/generate_video.js \
 //     --video ref.mp4 --main main.jpg [--crowd crowd.jpg] [--out result.mp4]
 //     [--resolution 480p] [--aspect 16:9] [--parts 1] [--seed 42] [--prompt-file p.txt]
-//     [--video-url https://...] [--model bytedance/seedance-2.5] [--dry-run]
+//     --video-url https://.../ref0.mp4[,https://.../ref1.mp4] [--keep-refs DIR]
+//     [--model bytedance/seedance-2.5] [--dry-run]
 //
 // Что делает:
 //  1. ffmpeg-ом обрезает исходник под выбранное соотношение сторон (убирает боковые рамки),
 //     ужимает до 480p/24 fps — референс меньше, запрос дешевле и быстрее грузится.
+//     Видео OpenRouter берёт только по публичной HTTPS-ссылке: сначала --dry-run --keep-refs DIR,
+//     заливаешь полученные ref*.mp4 куда угодно (прямая ссылка на .mp4) и передаёшь --video-url.
 //  2. Отправляет в POST /api/v1/videos: видео-референс (движение, камера, тайминг)
 //     + фото главного героя (+ фото для толпы).
 //  3. Ждёт готовности, скачивает и накладывает оригинальный звук из исходника.
@@ -116,6 +119,7 @@ async function main() {
   const opts = parseArgs(process.argv.slice(2));
   const key = process.env.OPENROUTER_API_KEY;
   if (!key && !opts.dryRun) throw new Error("Set OPENROUTER_API_KEY");
+  const videoUrls = opts.videoUrl ? opts.videoUrl.split(",") : [];
 
   const size = SIZES[opts.resolution][opts.aspect];
   const total = Math.round(probeDuration(opts.video));
@@ -123,6 +127,10 @@ async function main() {
   const lens = Array.from({ length: opts.parts }, (_, i) =>
     Math.floor(total / opts.parts) + (i < total % opts.parts ? 1 : 0));
   if (lens.some((l) => l < 4 || l > 30)) throw new Error(`Part lengths ${lens} must be within 4..30 s — change --parts`);
+  if (!opts.dryRun && videoUrls.length !== lens.length) {
+    throw new Error(`OpenRouter takes reference videos only as public HTTPS URLs. Run with --dry-run --keep-refs DIR, ` +
+      `upload the ${lens.length} prepared clip(s) and pass them as --video-url url1[,url2]`);
+  }
 
   const tokens = lens.reduce((s, l) => s + (size[0] * size[1] * FPS * l) / 1024, 0);
   console.log(`${opts.model}, ${size.join("×")} (${opts.resolution} ${opts.aspect}), ${total} s in ${opts.parts} part(s): ${lens.join(" + ")} s`);
@@ -131,13 +139,13 @@ async function main() {
   const prompt = opts.promptFile ? fs.readFileSync(opts.promptFile, "utf8") : PROMPT({ crowd: !!opts.crowd });
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "motion-"));
   try {
-    await generate(opts, { key, size, lens, prompt, tmp });
+    await generate(opts, { key, size, lens, prompt, tmp, videoUrls });
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
 }
 
-async function generate(opts, { key, size, lens, prompt, tmp }) {
+async function generate(opts, { key, size, lens, prompt, tmp, videoUrls }) {
   const outParts = [];
   let spent = 0;
   let start = 0;
@@ -146,6 +154,7 @@ async function generate(opts, { key, size, lens, prompt, tmp }) {
   for (let i = 0; i < lens.length; i++) {
     const ref = path.join(tmp, `ref${i}.mp4`);
     prepareReference(opts.video, ref, { start, duration: lens[i], size });
+    if (opts.keepRefs) fs.copyFileSync(ref, path.join(opts.keepRefs, `ref${i}.mp4`));
     console.log(`\nPart ${i + 1}/${lens.length}: ${start}–${start + lens[i]} s, reference ${(fs.statSync(ref).size / 1e6).toFixed(1)} MB`);
 
     const body = {
@@ -158,8 +167,8 @@ async function generate(opts, { key, size, lens, prompt, tmp }) {
       input_references: [
         { type: "image_url", image_url: { url: dataUrl(opts.main) } }, // image 1 — главный герой
         ...(opts.crowd ? [{ type: "image_url", image_url: { url: dataUrl(opts.crowd) } }] : []), // image 2 — толпа
-        // video 1 — движение и камера. Если base64 не примут, залей ref на любой хостинг и передай --video-url
-        { type: "video_url", video_url: { url: opts.videoUrl && lens.length === 1 ? opts.videoUrl : dataUrl(ref) } },
+        // video 1 — движение и камера. OpenRouter принимает видео только по HTTPS-ссылке (не base64)
+        { type: "video_url", video_url: { url: videoUrls[i] ?? "https://example.com/ref.mp4" } },
       ],
       ...(firstFrame ? { frame_images: [{ type: "image_url", frame_type: "first_frame", image_url: { url: dataUrl(firstFrame) } }] } : {}),
       ...(opts.seed != null ? { seed: opts.seed } : {}),

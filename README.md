@@ -29,10 +29,13 @@ node src/build_docx.js   # Word с текстом
 через Seedance 2.5 на OpenRouter. Нужны Node 20+ и ffmpeg. 28 сек в 480p — примерно $1.7 за попытку.
 
 ```bash
+# 1. подготовить референс (480p, 24 fps, без рамок) — ничего не отправляет
+node src/generate_video.js --video reference.mp4 --main main.jpg --dry-run --keep-refs .
+# 2. залить ref0.mp4 туда, где есть прямая HTTPS-ссылка на файл, и запустить
 OPENROUTER_API_KEY=... NODE_USE_ENV_PROXY=1 node src/generate_video.js \
-  --video reference.mp4 --main main.jpg --crowd crowd.jpg --out result.mp4
+  --video reference.mp4 --main main.jpg --crowd crowd.jpg --video-url https://.../ref0.mp4 --out result.mp4
 ```
 
-`--dry-run` показывает запрос и цену, ничего не отправляя. Если модель не примет 28 сек за раз — `--parts 2`.
-Если не примет видео в base64 — залей подготовленный референс на хостинг и передай `--video-url`.
+`--dry-run` показывает запрос и цену, ничего не отправляя. Если модель не примет 28 сек за раз — `--parts 2` (тогда два клипа и две ссылки через запятую).
+Видео OpenRouter принимает только по HTTPS-ссылке, фото можно локальными файлами.
 Другие опции: `--resolution 720p`, `--aspect 21:9`, `--seed 42`, `--prompt-file prompt.txt`.
