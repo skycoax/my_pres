@@ -17,7 +17,8 @@
 //     + фото главного героя (+ фото для толпы).
 //  3. Ждёт готовности, скачивает и накладывает оригинальный звук из исходника.
 // --parts 2 режет ролик на куски (если модель откажется брать 28 сек за раз);
-// каждый следующий кусок стартует с последнего кадра предыдущего, затем всё склеивается.
+// каждый следующий кусок стартует с последнего кадра предыдущего (кроме HeyGen), затем всё склеивается.
+// Готовые куски сохраняются как result.partN.mp4 — если что-то упало, перезапуск их не пересоздаёт.
 const fs = require("fs");
 const path = require("path");
 const os = require("os");
@@ -176,7 +177,8 @@ async function generate(opts, { key, size, lens, prompt, tmp, videoUrls }) {
         // video 1 — движение и камера. OpenRouter принимает видео только по HTTPS-ссылке (не base64)
         { type: "video_url", video_url: { url: videoUrls[i] ?? "https://example.com/ref.mp4" } },
       ],
-      ...(firstFrame ? { frame_images: [{ type: "image_url", frame_type: "first_frame", image_url: { url: dataUrl(firstFrame) } }] } : {}),
+      // HeyGen не принимает первый кадр вместе с input_references
+      ...(firstFrame && !opts.model.startsWith("heygen/") ? { frame_images: [{ type: "image_url", frame_type: "first_frame", image_url: { url: dataUrl(firstFrame) } }] } : {}),
       ...(opts.seed != null ? { seed: opts.seed } : {}),
     };
 
@@ -187,13 +189,18 @@ async function generate(opts, { key, size, lens, prompt, tmp, videoUrls }) {
       continue;
     }
 
-    let job = await api("POST", `${API}/videos`, key, body);
-    console.log(`  job ${job.id} submitted`);
-    job = await waitForVideo(job, key);
-    const part = path.join(tmp, `out${i}.mp4`);
-    await download(job, key, part);
-    spent += job.usage?.cost ?? 0;
-    console.log(`  done${job.usage?.cost != null ? `, cost $${job.usage.cost}` : ""}`);
+    // Готовые куски лежат рядом с результатом: при повторном запуске они не генерируются заново
+    const part = `${opts.out.replace(/\.mp4$/i, "")}.part${i + 1}.mp4`;
+    if (fs.existsSync(part)) {
+      console.log(`  reusing ${part}`);
+    } else {
+      let job = await api("POST", `${API}/videos`, key, body);
+      console.log(`  job ${job.id} submitted`);
+      job = await waitForVideo(job, key);
+      await download(job, key, part);
+      spent += job.usage?.cost ?? 0;
+      console.log(`  done${job.usage?.cost != null ? `, cost $${job.usage.cost}` : ""}`);
+    }
     outParts.push(part);
 
     if (i < lens.length - 1) {
@@ -208,7 +215,8 @@ async function generate(opts, { key, size, lens, prompt, tmp, videoUrls }) {
   let video = outParts[0];
   if (outParts.length > 1) {
     const list = path.join(tmp, "list.txt");
-    fs.writeFileSync(list, outParts.map((p) => `file '${p}'`).join("\n"));
+    // модель может вернуть чуть длиннее, чем просили — режем до заказанной длины, чтобы не уехал звук
+    fs.writeFileSync(list, outParts.map((p, i) => `file '${path.resolve(p)}'\noutpoint ${lens[i]}`).join("\n"));
     video = path.join(tmp, "joined.mp4");
     ffmpeg(["-f", "concat", "-safe", "0", "-i", list, "-c:v", "libx264", "-crf", "18", "-pix_fmt", "yuv420p", "-an", video]);
   }
