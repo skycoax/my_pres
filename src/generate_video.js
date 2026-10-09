@@ -31,7 +31,9 @@ const SIZES = {
   "480p": { "16:9": [854, 480], "21:9": [992, 432], "4:3": [752, 560], "1:1": [640, 640], "9:16": [480, 854] },
   "720p": { "16:9": [1280, 720], "21:9": [1470, 630], "4:3": [1112, 834], "1:1": [960, 960], "9:16": [720, 1280] },
 };
-const PRICE_PER_TOKEN_WITH_VIDEO_INPUT = 6.4e-6; // $ за видео-токен, когда на входе есть видео
+const PRICE_PER_TOKEN_WITH_VIDEO_INPUT = 6.4e-6; // Seedance 2.5: $ за видео-токен, когда на входе есть видео
+// Модели с оплатой за секунду при видео-референсе ($/сек, из /api/v1/videos/models → pricing_skus)
+const PRICE_PER_SECOND = { "heygen/heygen-video-1": { "480p": 0.04, "768p": 0.06, "2K": 0.18 } };
 
 const PROMPT = ({ crowd }) => `Recreate video 1 exactly: same motion, choreography, timing, rhythm, camera angle, camera movement, framing, cuts and crowd formation. Change only who the people are.
 
@@ -132,9 +134,12 @@ async function main() {
       `upload the ${lens.length} prepared clip(s) and pass them as --video-url url1[,url2]`);
   }
 
-  const tokens = lens.reduce((s, l) => s + (size[0] * size[1] * FPS * l) / 1024, 0);
+  const perSecond = PRICE_PER_SECOND[opts.model]?.[opts.resolution];
+  const estimate = perSecond
+    ? total * perSecond
+    : lens.reduce((s, l) => s + (size[0] * size[1] * FPS * l) / 1024, 0) * PRICE_PER_TOKEN_WITH_VIDEO_INPUT;
   console.log(`${opts.model}, ${size.join("×")} (${opts.resolution} ${opts.aspect}), ${total} s in ${opts.parts} part(s): ${lens.join(" + ")} s`);
-  console.log(`Estimated cost ≈ $${(tokens * PRICE_PER_TOKEN_WITH_VIDEO_INPUT).toFixed(2)} per attempt (actual cost is reported after generation)`);
+  console.log(`Estimated cost ≈ $${estimate.toFixed(2)} per attempt (actual cost is reported after generation)`);
 
   const prompt = opts.promptFile ? fs.readFileSync(opts.promptFile, "utf8") : PROMPT({ crowd: !!opts.crowd });
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "motion-"));
